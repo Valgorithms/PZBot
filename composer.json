@@ -1,0 +1,37 @@
+{
+    "name": "valgorithms/pzbot",
+    "description": "Valgorithm's offical Discord bot for Project Zomboid built in ReactPHP.",
+    "authors": [
+        {
+            "name": "Valithor Obsidion",
+            "email": "valithor@valzargaming.com"
+        }
+    ],
+    "require": {
+        "php": "^8.0.0",
+        "team-reflex/discord-php": "dev-master",
+        "clue/redis-react": "^2.6",
+        "wyrihaximus/react-cache-redis": "^4.2.0",
+        "react/filesystem": "^0.2@dev",
+        "react/async": "4.x-dev",
+        "react/child-process": "0.6.4"
+    },
+    "suggest": {
+        "ext-uv": "For a faster, and more performant loop. PHP >=7 only. Preferred.",
+        "ext-libev": "For a faster, and more performant loop",
+        "ext-event": "For a faster, and more performant loop",
+        "ext-mbstring": "For accurate calculations of string length when handling non-english characters.",
+        "vzgcoders/twitchphp": "For integration with Twitch chat."
+    },
+    "scripts": {
+        "cs": ["./vendor/bin/php-cs-fixer fix"],
+        "unit": ["./vendor/bin/phpunit"]
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "wyrihaximus/composer-update-bin-autoload-path": true
+        }
+    }
+}
