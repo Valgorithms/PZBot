@@ -42,6 +42,6 @@ type pz_players.txt
 
 REM Clean up temporary files
 del pz_output.txt
-REM del pz_players.txt
+del pz_players.txt
 
 endlocal

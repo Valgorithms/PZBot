@@ -8,14 +8,12 @@
 
 namespace PZ;
 
-require 'Handler.php';
-require 'MessageHandler.php';
-
 use Discord\Discord;
 //use Discord\Builders\MessageBuilder;
 use Discord\Helpers\BigInt;
 //use Discord\Helpers\Collection;
 use Discord\Parts\Channel\Message;
+use Discord\Repository\Interaction\GlobalCommandRepository;
 use React\EventLoop\Loop;
 use React\EventLoop\LoopInterface;
 use React\EventLoop\StreamSelectLoop;
@@ -28,17 +26,19 @@ use Monolog\Handler\StreamHandler;
 class BOT
 {
     public StreamSelectLoop $loop;
-    public Discord $discord;
-    public bool $ready = false;
     public Logger $logger;
-    public RCON $rcon;    
+
+    public Discord $discord;
+    public Slash $slash;
+    public RCON $rcon;
+    public bool $ready = false;
     private readonly array $options;
 
     public MessageHandler $messageHandler;
     
     public readonly string $owner_id;
     public readonly string $command_symbol;
-    public readonly string $guild_id;
+    public readonly string $guild_id; // This bot currently only supports one guild at a time
     public array $channel_ids = [];
     public array $role_ids = [];
 
@@ -82,8 +82,10 @@ class BOT
         if (isset($options['discord']) && ($options['discord'] instanceof Discord)) $this->discord = $options['discord'];
         elseif (isset($options['discord_options']) && is_array($options['discord_options'])) $this->discord = new Discord($options['discord_options']);
         else $this->logger->error('No Discord instance or options passed in options!');
-        
         if (isset($options['discordToken'])) unset($options['discordToken']);
+
+        require 'slash.php';
+        $this->slash = new Slash($this);
 
         if (! isset($options['rcon']) || ! ($options['rcon'] instanceof RCON)) throw new \InvalidArgumentException('Invalid RCON object!');
         $this->rcon = $options['rcon'];
@@ -112,11 +114,18 @@ class BOT
 
             $this->rcon->getPlayers(true);
             $this->__startUpdatePlayerCountTimer();
+
+            $this->discord->application->commands->freshen()->then(function (GlobalCommandRepository $commands): void
+            {
+                $this->slash->updateCommands($commands);
+            });
+
+            $this->discord->on('message', function ($message) {
+                $this->messageHandler->handle($message);
+            });
         });
 
-        $this->discord->on('message', function ($message) {
-            $this->messageHandler->handle($message);
-        });
+        
 
         $this->discord->run();
     }

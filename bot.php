@@ -16,8 +16,10 @@ define('MAIN_INCLUDED', 1); // Token and SQL credential files may be protected l
 include getcwd() . '/vendor/autoload.php';
 
 require 'secret.php';
-require 'rcon.php';
-require 'pz.php';
+require 'RCON.php';
+require 'PZ.php';
+require 'Handler.php';
+require 'MessageHandler.php';
 
 const MCRCON_DIR = __DIR__;
 const MCRCON_FILE = 'mcrcon.exe';
@@ -31,8 +33,6 @@ $rconPassword = getenv('rcon_password');
 $globalIp = gethostbyname('www.valzargaming.com');
 
 $rcon = new PZ\RCON($globalIp, RCON_PORT, $rconPassword, MCRCON_DIR, MCRCON_FILE, BAT_DIR, BAT_FILE);
-//$players = $rcon->getPlayers();
-//var_dump($players);
 
 use Discord\Discord;
 use React\EventLoop\Loop;
