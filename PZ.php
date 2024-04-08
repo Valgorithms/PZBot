@@ -17,6 +17,7 @@ use Discord\Repository\Interaction\GlobalCommandRepository;
 use React\EventLoop\Loop;
 use React\EventLoop\LoopInterface;
 use React\EventLoop\StreamSelectLoop;
+use React\EventLoop\TimerInterface;
 use React\Promise\PromiseInterface;
 use Monolog\Logger;
 use Monolog\Level;
@@ -205,7 +206,8 @@ class BOT
                     $promise = $this->__updatePlayerCountChannel($populate = true);
                 }
 
-                $sendTransitMessage = function ($populate, $channel_id): void
+                $channel_id = $channel->id;
+                $sendTransitMessage = function () use ($populate, $channel_id): void
                 {
                     if (! $channel = $this->discord->getChannel($channel_id)) return;
                     $msg = '';
@@ -213,15 +215,15 @@ class BOT
                     if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft()) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
                     if ($msg) $this->messageHandler->sendMessage($channel, $msg);
                 };
-                $onFulfilled = function ($new_channel) use ($sendTransitMessage, $populate): void
+                $onFulfilled = function ($new_channel) use ($sendTransitMessage): TimerInterface
                 {
-                    $this->loop->addTimer(2, $sendTransitMessage($populate, $new_channel->id));
                     $this->timerCounter = 0;
+                    return $this->loop->addTimer(2, $sendTransitMessage);
                 };
-                $onRejected = function ($reason) use ($channel): void
+                $onRejected = function ($reason) use ($channel): ?PromiseInterface
                 {
                     $this->logger->error('Failed to update player count channel: ' . $reason);
-                    $this->messageHandler->sendMessage($channel, 'Failed to update player count channel: ' . $reason);
+                    return $this->messageHandler->sendMessage($channel, 'Failed to update player count channel: ' . $reason);
                 };
                 if ($promise) $this->then($promise, $onFulfilled , $onRejected);
                 else {
