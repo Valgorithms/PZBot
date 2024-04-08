@@ -44,6 +44,9 @@ class BOT
 
     public array $timers = [];
     public int $timerCounter = 0;
+
+    public \Closure $onFulfilledDefault;
+    public \Closure $onRejectedDefault;
     
     public function __construct(array $options)
     {
@@ -73,6 +76,14 @@ class BOT
         }
         $this->loop = $options['loop'];
         $this->logger = $options['logger'];
+        $this->onFulfilledDefault = function ($result): void
+        {
+            $this->logger->debug('Promise resolved with type of: `' . gettype($result) . '`');
+        };
+        $this->onRejectedDefault = function ($reason): void
+        {
+            $this->logger->error("Promise rejected with reason: `$reason'`");
+        };
 
         if (isset($options['channel_ids'])) foreach ($options['channel_ids'] as $key => $id) $this->channel_ids[$key] = $id;
         else $this->logger->warning('No channel_ids passed in options!');
@@ -100,6 +111,11 @@ class BOT
         return $options;
     }
 
+    public function then(PromiseInterface $promise, ?callable $onFulfilled = null, ?callable $onRejected = null): PromiseInterface
+    {
+        return $promise->then($onFulfilled ?? $this->onFulfilledDefault, $onRejected ?? $this->onRejectedDefault);
+    }
+
     public function run()
     {
         $this->discord->on('ready', function ($discord) {
@@ -115,7 +131,7 @@ class BOT
             $this->rcon->getPlayers(true);
             $this->__startUpdatePlayerCountTimer();
 
-            $this->discord->application->commands->freshen()->then(function (GlobalCommandRepository $commands): void
+            $this->then($this->discord->application->commands->freshen(), function (GlobalCommandRepository $commands): void
             {
                 $this->slash->updateCommands($commands);
             });
@@ -207,7 +223,7 @@ class BOT
                     $this->logger->error('Failed to update player count channel: ' . $reason);
                     $this->messageHandler->sendMessage($channel, 'Failed to update player count channel: ' . $reason);
                 };
-                if ($promise) $promise->then($onFulfilled , $onRejected);
+                if ($promise) $this->then($promise, $onFulfilled , $onRejected);
                 else {
                     $sendTransitMessage($populate, $channel->id);
                     $this->timerCounter++;
