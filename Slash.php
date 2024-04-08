@@ -74,7 +74,7 @@ class Slash
             if (! $players = $this->pz->rcon->getPlayers()) return $interaction->respondWithMessage(MessageBuilder::new()->setContent('No players found!'));
             $playerCount = count($players);
             $playerList = implode(', ', $players);
-            return $interaction->respondWithMessage(MessageBuilder::new()->setContent("Players ($playerCount):" . PHP_EOL . $playerList, true));
+            return $interaction->respondWithMessage(MessageBuilder::new()->setContent("Players ($playerCount):" . PHP_EOL . $playerList), true);
         });
     }
 }
