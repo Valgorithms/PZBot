@@ -179,7 +179,7 @@ class BOT
     {
 
         if (! isset($this->timers['updatePlayerCountTimer'])) {
-            $this->timers['updatePlayerCountTimer'] = $this->loop->addPeriodicTimer(30, function(): void
+            $periodic = function(): void
             {
                 if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return;
 
@@ -197,21 +197,23 @@ class BOT
                     if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft()) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
                     if ($msg) $this->messageHandler->sendMessage($channel, $msg);
                 };
-                $onReject = function ($reason) use ($channel): void
+                $onFulfilled = function ($new_channel) use ($sendTransitMessage, $populate): void
+                {
+                    $this->loop->addTimer(2, $sendTransitMessage($populate, $new_channel->id));
+                    $this->timerCounter = 0;
+                };
+                $onRejected = function ($reason) use ($channel): void
                 {
                     $this->logger->error('Failed to update player count channel: ' . $reason);
                     $this->messageHandler->sendMessage($channel, 'Failed to update player count channel: ' . $reason);
                 };
-                if ($promise) $promise->then(function() use ($sendTransitMessage, $populate, $channel): void
-                {
-                    $this->loop->addTimer(2, $sendTransitMessage($populate, $channel->id));
-                    $this->timerCounter = 0;
-                }, $onReject);
+                if ($promise) $promise->then($onFulfilled , $onRejected);
                 else {
                     $sendTransitMessage($populate, $channel->id);
                     $this->timerCounter++;
                 }
-            });
+            };
+            $this->timers['updatePlayerCountTimer'] = $this->loop->addPeriodicTimer(30, $periodic);
         }
     }
 }
