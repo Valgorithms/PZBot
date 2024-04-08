@@ -163,7 +163,7 @@ class BOT
         if (is_numeric($oldPlayerCount) && (intval($oldPlayerCount) === $newPlayerCount)) return null;
         
         $channel->name = "{$channelName}-{$newPlayerCount}";
-        return $channel->guild->channels->save($channel);
+        return $channel->guild->channels->save($channel, 'Player count update');
     }
 
     protected function __startUpdatePlayerCountTimer(): void
@@ -174,18 +174,34 @@ class BOT
             {
                 if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return;
 
+                $promise = null;
                 $populate = false;
                 if (($this->timerCounter !== 0) && ($this->timerCounter % 6 === 0)) {
-                    $this->__updatePlayerCountChannel($populate = true);
-                    $this->timerCounter = 0;
+                    $promise = $this->__updatePlayerCountChannel($populate = true);
                 }
 
-                $msg = '';
-                if ($playersWhoJoined = $this->rcon->getPlayersWhoJoined($populate ? false : true)) $msg .= 'Connected: ' . implode(', ', $playersWhoJoined) . PHP_EOL;
-                if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft()) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
-                if ($msg) $this->messageHandler->sendMessage($channel, $msg);
-
-                $this->timerCounter++;
+                $sendTransitMessage = function ($populate, $channel_id): void
+                {
+                    if (! $channel = $this->discord->getChannel($channel_id)) return;
+                    $msg = '';
+                    if ($playersWhoJoined = $this->rcon->getPlayersWhoJoined($populate ? false : true)) $msg .= 'Connected: ' . implode(', ', $playersWhoJoined) . PHP_EOL;
+                    if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft()) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
+                    if ($msg) $this->messageHandler->sendMessage($channel, $msg);
+                };
+                $onReject = function ($reason) use ($channel): void
+                {
+                    $this->logger->error('Failed to update player count channel: ' . $reason);
+                    $this->messageHandler->sendMessage($channel, 'Failed to update player count channel: ' . $reason);
+                };
+                if ($promise) $promise->then(function() use ($sendTransitMessage, $populate, $channel): void
+                {
+                    $this->loop->addTimer(2, $sendTransitMessage($populate, $channel->id));
+                    $this->timerCounter = 0;
+                }, $onReject);
+                else {
+                    $sendTransitMessage($populate, $channel->id);
+                    $this->timerCounter++;
+                }
             });
         }
     }

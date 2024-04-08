@@ -31,8 +31,8 @@ $rconPassword = getenv('rcon_password');
 $globalIp = gethostbyname('www.valzargaming.com');
 
 $rcon = new PZ\RCON($globalIp, RCON_PORT, $rconPassword, MCRCON_DIR, MCRCON_FILE, BAT_DIR, BAT_FILE);
-$players = $rcon->getPlayers();
-var_dump($players);
+//$players = $rcon->getPlayers();
+//var_dump($players);
 
 use Discord\Discord;
 use React\EventLoop\Loop;
