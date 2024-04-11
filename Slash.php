@@ -71,7 +71,7 @@ class Slash
 
         $this->pz->discord->listenCommand('players', function (Interaction $interaction): PromiseInterface
         {
-            if (! $players = $this->pz->rcon->getPlayers()) return $interaction->respondWithMessage(MessageBuilder::new()->setContent('No players found!'));
+            if (! $players = $this->pz->rcon->getPlayers()) return $interaction->respondWithMessage(MessageBuilder::new()->setContent('No players found!'), true);
             $playerCount = count($players);
             $playerList = implode(', ', $players);
             return $interaction->respondWithMessage(MessageBuilder::new()->setContent("Players ($playerCount):" . PHP_EOL . $playerList), true);
