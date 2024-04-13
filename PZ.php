@@ -28,12 +28,12 @@ class BOT
 {
     public StreamSelectLoop $loop;
     public Logger $logger;
+    protected readonly array $options;
 
     public Discord $discord;
     public Slash $slash;
     public RCON $rcon;
     public bool $ready = false;
-    private readonly array $options;
 
     public MessageHandler $messageHandler;
     
@@ -56,7 +56,7 @@ class BOT
         // x86 need gmp extension for big integer operation
         if (PHP_INT_SIZE === 4 && ! BigInt::init()) trigger_error('ext-gmp is not loaded. Permissions will NOT work correctly!', E_USER_WARNING);
 
-        $this->options = $this->resolveOptions($options);
+        $this->resolveOptions($options);
 
         $this->afterConstruct($options/*, $server_options*/);
     }
@@ -109,7 +109,7 @@ class BOT
         else $options['command_symbol'] = ';';
         $this->command_symbol = $options['command_symbol'];
 
-        return $options;
+        return $this->options = $options;
     }
 
     public function then(PromiseInterface $promise, ?callable $onFulfilled = null, ?callable $onRejected = null): PromiseInterface

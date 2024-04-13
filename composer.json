@@ -33,5 +33,10 @@
         "allow-plugins": {
             "wyrihaximus/composer-update-bin-autoload-path": true
         }
+    },
+    "autoload": {
+        "psr-4": {
+            "Root\\": "./"
+        }
     }
 }
