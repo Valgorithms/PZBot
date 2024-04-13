@@ -82,11 +82,9 @@ class RCON
     {
         $this->previousPlayers = $this->currentPlayers;
         
-        if (! is_string($playersString = $this->__getPlayersString())) $playersString = '';
-
-        $this->currentPlayers = $playersString ? explode("\n", trim($playersString)) : []; // IMPORTANT: Cannot supplement "\n" with PHP_EOL because the batch file is executed on Windows and that's apparently a fucking problem
-
-        return $this->currentPlayers;
+        $playersString = $this->__getPlayersString();
+        $playersString = is_string($playersString) ? str_replace("Error: Failed to execute mcrcon command.", "", $playersString) : '';
+        return $this->currentPlayers = $playersString ? explode("\n", trim($playersString)) : [];
     }
     
     /*
