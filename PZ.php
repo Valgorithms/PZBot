@@ -183,6 +183,7 @@ class BOT
     protected function __updatePlayerCountChannel(): ?PromiseInterface
     {
         if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return null;
+        if (! $channel->created) return null;
         
         [$channelName, $oldPlayerCount] = explode('-', $channel->name);
         $newPlayerCount = $this->rcon->getPlayerCount(true);
@@ -194,11 +195,11 @@ class BOT
 
     protected function __startUpdatePlayerCountTimer(): void
     {
-
         if (! isset($this->timers['updatePlayerCountTimer'])) {
             $periodic = function(): void
             {
                 if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return;
+                if (! $channel->created) return;
 
                 $promise = null;
                 $populate = false;
@@ -210,6 +211,7 @@ class BOT
                 $sendTransitMessage = function () use ($populate, $channel_id): void
                 {
                     if (! $channel = $this->discord->getChannel($channel_id)) return;
+                    if (! $channel->created) return;
                     $msg = '';
                     if ($playersWhoJoined = $this->rcon->getPlayersWhoJoined($populate ? false : true)) $msg .= 'Connected: ' . implode(', ', $playersWhoJoined) . PHP_EOL;
                     if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft()) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
@@ -218,16 +220,16 @@ class BOT
                 $onFulfilled = function ($new_channel) use ($sendTransitMessage): TimerInterface
                 {
                     $this->timerCounter = 0;
-                    return $this->loop->addTimer(2, $sendTransitMessage);
+                    return $this->loop->addTimer(2, $sendTransitMessage); // Doesn't fix the race condition, can still create a new channel and send all future messages to the newly created channel even though we are fetching the channel's ID directly from a hard-coded config
                 };
                 $onRejected = function ($reason) use ($channel): ?PromiseInterface
                 {
                     $this->logger->error('Failed to update player count channel: ' . $reason);
                     return $this->messageHandler->sendMessage($channel, 'Failed to update player count channel: ' . $reason);
                 };
-                if ($promise) $this->then($promise, $onFulfilled , $onRejected);
+                if ($promise) $this->then($promise, $onFulfilled, $onRejected);
                 else {
-                    $sendTransitMessage($populate, $channel->id);
+                    $sendTransitMessage();
                     $this->timerCounter++;
                 }
             };
