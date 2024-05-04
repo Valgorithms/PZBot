@@ -183,14 +183,24 @@ class BOT
     protected function __updatePlayerCountChannel(): ?PromiseInterface
     {
         if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return null;
-        if (! $channel->created) return null;
+        //if (! $channel->created) return null;
         
         [$channelName, $oldPlayerCount] = explode('-', $channel->name);
         $newPlayerCount = $this->rcon->getPlayerCount(true);
         if (is_numeric($oldPlayerCount) && (intval($oldPlayerCount) === $newPlayerCount)) return null;
         
         $channel->name = "{$channelName}-{$newPlayerCount}";
-        return $channel->guild->channels->save($channel, 'Player count update');
+        $original_channel = clone $channel;
+        return $channel->guild->channels->save($channel, 'Player count update')->then(function ($new_channel) use ($original_channel): void
+        { // Debugging channel ID mismatch
+            if ($new_channel->id !== $original_channel->id) {
+                $this->logger->warning('Channel ID mismatch: ' . $new_channel->id . ' !== ' . $original_channel->id);
+                file_put_contents('original_channel.txt', print_r($original_channel, true));
+                file_put_contents('new_channel.txt', print_r($new_channel, true));
+                $new_channel->guild->channels->offsetSet($original_channel->id, $original_channel);
+                $new_channel->guild->channels->offsetSet($new_channel->id, $new_channel);
+            }
+        });
     }
 
     protected function __startUpdatePlayerCountTimer(): void
@@ -199,7 +209,7 @@ class BOT
             $periodic = function(): void
             {
                 if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return;
-                if (! $channel->created) return;
+                //if (! $channel->created) return;
 
                 $promise = null;
                 $populate = false;
@@ -211,7 +221,7 @@ class BOT
                 $sendTransitMessage = function () use ($populate, $channel_id): void
                 {
                     if (! $channel = $this->discord->getChannel($channel_id)) return;
-                    if (! $channel->created) return;
+                    //if (! $channel->created) return;
                     $msg = '';
                     if ($playersWhoJoined = $this->rcon->getPlayersWhoJoined($populate ? false : true)) $msg .= 'Connected: ' . implode(', ', $playersWhoJoined) . PHP_EOL;
                     if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft()) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
