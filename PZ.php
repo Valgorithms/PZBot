@@ -210,24 +210,30 @@ class BOT
             {
                 if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return;
                 //if (! $channel->created) return;
+                $original_channel = clone $channel; // Debugging channel ID mismatch
 
                 $promise = null;
                 $populate = false;
-                if (($this->timerCounter !== 0) && ($this->timerCounter % 6 === 0)) {
-                    $promise = $this->__updatePlayerCountChannel($populate = true);
-                }
+                if (($this->timerCounter !== 0) && ($this->timerCounter % 6 === 0)) $promise = $this->__updatePlayerCountChannel($populate = true);
 
-                $channel_id = $channel->id;
-                $sendTransitMessage = function () use ($populate, $channel_id): void
+                $sendTransitMessage = function () use ($populate, $original_channel): void
                 {
-                    if (! $channel = $this->discord->getChannel($channel_id)) return;
-                    //if (! $channel->created) return;
-                    $msg = '';
-                    if ($playersWhoJoined = $this->rcon->getPlayersWhoJoined($populate ? false : true)) $msg .= 'Connected: ' . implode(', ', $playersWhoJoined) . PHP_EOL;
-                    if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft()) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
-                    if ($msg) $this->messageHandler->sendMessage($channel, $msg);
+                    if (! $channel = $this->discord->getChannel($original_channel->id)) return;
+                    $callable = function ($channel) use ($populate) {
+                        $msg = '';
+                        if ($playersWhoJoined = $this->rcon->getPlayersWhoJoined($populate ? false : true)) $msg .= 'Connected: ' . implode(', ', $playersWhoJoined) . PHP_EOL;
+                        if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft()) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
+                        if ($msg) $this->messageHandler->sendMessage($channel, $msg);
+                    };
+                    if ($channel !== $original_channel) {
+                        $this->logger->warning('Channel ID mismatch: ' . $channel->id . ' !== ' . $original_channel->id);
+                        file_put_contents('original_channel.txt', print_r($original_channel, true));
+                        file_put_contents('new_channel.txt', print_r($channel, true));
+                        $channel->guild->channels->fetch($original_channel->id, true)->then(function ($new_channel) use ($callable): void
+                        { $callable($new_channel); });
+                    } else $callable($channel);
                 };
-                $onFulfilled = function ($new_channel) use ($sendTransitMessage): TimerInterface
+                $onFulfilled = function (mixed $new_channel) use ($sendTransitMessage): TimerInterface
                 {
                     $this->timerCounter = 0;
                     return $this->loop->addTimer(2, $sendTransitMessage); // Doesn't fix the race condition, can still create a new channel and send all future messages to the newly created channel even though we are fetching the channel's ID directly from a hard-coded config
