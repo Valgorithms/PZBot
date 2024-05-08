@@ -225,7 +225,7 @@ class BOT
                         if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft()) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
                         if ($msg) $this->messageHandler->sendMessage($channel, $msg);
                     };
-                    if ($channel !== $original_channel) {
+                    if ($channel->id !== $original_channel->id) {
                         $this->logger->warning('Channel ID mismatch: ' . $channel->id . ' !== ' . $original_channel->id);
                         file_put_contents('original_channel.txt', print_r($original_channel, true));
                         file_put_contents('new_channel.txt', print_r($channel, true));
