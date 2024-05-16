@@ -221,8 +221,8 @@ class BOT
                     if (! $channel = $this->discord->getChannel($original_channel->id)) return;
                     $callable = function ($channel) use ($populate) {
                         $msg = '';
-                        if ($playersWhoJoined = $this->rcon->getPlayersWhoJoined($populate ? false : true)) $msg .= 'Connected: ' . implode(', ', $playersWhoJoined) . PHP_EOL;
-                        if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft()) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
+                        if (! empty($playersWhoJoined = $this->rcon->getPlayersWhoJoined($populate ? false : true))) $msg .= 'Connected: ' . implode(', ', $playersWhoJoined) . PHP_EOL;
+                        if (! empty($playersWhoLeft = $this->rcon->getPlayersWhoLeft())) $msg .= 'Disconnected: ' . implode(', ', $playersWhoLeft) . PHP_EOL;
                         if ($msg) $this->messageHandler->sendMessage($channel, $msg);
                     };
                     if ($channel->id !== $original_channel->id) {
