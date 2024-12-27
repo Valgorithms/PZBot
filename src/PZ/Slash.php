@@ -10,11 +10,8 @@ namespace PZ;
 
 use Discord\Builders\MessageBuilder;
 use React\Promise\PromiseInterface;
-use Discord\Helpers\Repository;
-use Discord\Parts\Embed\Embed;
 use Discord\Parts\Interactions\Interaction;
 use Discord\Parts\Interactions\Command\Command;
-use Discord\Parts\Permissions\RolePermission;
 use Discord\Repository\Guild\GuildCommandRepository;
 use Discord\Repository\Interaction\GlobalCommandRepository;
 
@@ -35,7 +32,7 @@ class Slash
     {
         // 
     }
-    public function updateCommands(GlobalCommandRepository $commands): void
+    public function updateGlobalCommands(GlobalCommandRepository $commands): void
     {
         // if ($command = $commands->get('name', 'ping')) $commands->delete($command->id);
         if (! $commands->get('name', 'ping')) $commands->save(new Command($this->pz->discord, [
@@ -57,24 +54,26 @@ class Slash
 
         $this->declareListeners();
     }
+    public function updateGuildCommands(GuildCommandRepository $commands): void
+    {
+        //
+    }
     public function declareListeners(): void
     {
-        $this->pz->discord->listenCommand('ping', function (Interaction $interaction): PromiseInterface
-        {
-            return $interaction->respondWithMessage(MessageBuilder::new()->setContent('Pong!'));
-        });
+        $this->pz->discord->listenCommand('ping', fn(Interaction $interaction): PromiseInterface =>
+            $interaction->respondWithMessage(MessageBuilder::new()->setContent('Pong!'))
+        );
 
-        $this->pz->discord->listenCommand('help', function (Interaction $interaction): PromiseInterface
-        {
-            return $interaction->respondWithMessage(MessageBuilder::new()->setContent($this->pz->messageHandler->generateHelp($interaction->member->roles)), true);
-        });
+        $this->pz->discord->listenCommand('help', fn(Interaction $interaction): PromiseInterface =>
+            $interaction->respondWithMessage(MessageBuilder::new()->setContent($this->pz->messageHandler->generateHelp($interaction->member->roles)), true)
+        );
 
-        $this->pz->discord->listenCommand('players', function (Interaction $interaction): PromiseInterface
-        {
-            if (! $players = $this->pz->rcon->getPlayers()) return $interaction->respondWithMessage(MessageBuilder::new()->setContent('No players found!'), true);
-            $playerCount = count($players);
-            $playerList = implode(', ', $players);
-            return $interaction->respondWithMessage(MessageBuilder::new()->setContent("Players ($playerCount):" . PHP_EOL . $playerList), true);
-        });
+        $this->pz->discord->listenCommand('players', fn(Interaction $interaction): PromiseInterface =>
+            $interaction->respondWithMessage(MessageBuilder::new()->setContent(
+                ($players = $this->pz->rcon->getPlayers())
+                    ? "Players (" . count($players) . "):" . PHP_EOL . implode(', ', $players)
+                    : 'No players found!'
+            ), true)
+        );
     }
 }

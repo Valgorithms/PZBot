@@ -13,6 +13,7 @@ use Discord\Discord;
 use Discord\Helpers\BigInt;
 //use Discord\Helpers\Collection;
 use Discord\Parts\Channel\Message;
+use Discord\Repository\Guild\GuildCommandRepository;
 use Discord\Repository\Interaction\GlobalCommandRepository;
 use React\EventLoop\Loop;
 use React\EventLoop\LoopInterface;
@@ -115,7 +116,6 @@ class Bot
         foreach ($options['channel_ids'] as $key => $id) $this->channel_ids[$key] = $id;
         foreach ($options['role_ids'] as $key => $id) $this->role_ids[$key] = $id;
 
-        require 'slash.php';
         $this->slash = new Slash($this);
 
         $this->rcon = $options['rcon'];
@@ -147,13 +147,17 @@ class Bot
 
             $this->then(
                 $this->discord->application->commands->freshen(),
-                fn (GlobalCommandRepository $commands) => $this->slash->updateCommands($commands)
+                fn (GlobalCommandRepository $commands) => $this->slash->updateGlobalCommands($commands)
             );
+            foreach ($this->discord->guilds as $guild) {
+                $this->then(
+                    $guild->commands->freshen(),
+                    fn (GuildCommandRepository $commands) => $this->slash->updateGuildCommands($commands)
+                );
+            }
 
             $this->discord->on('message', fn($message) => $this->messageHandler->handle($message));
         });
-
-        
 
         $this->discord->run();
     }
@@ -167,15 +171,15 @@ class Bot
     protected function generateGlobalFunctions(): void
     { // TODO: add infantry and veteran roles to all non-staff command parameters except for `approveme`
         // messageHandler
-        $this->messageHandler->offsetSet('ping', new MessageHandlerCallback(function (Message $message, array $message_filtered, string $command): PromiseInterface
-        {
-            return $this->messageHandler->reply($message, 'Pong!');
-        }));
+        $this->messageHandler->offsetSet(
+            'ping',
+            new MessageHandlerCallback(fn(Message $message, array $message_filtered, string $command): PromiseInterface =>
+                $this->messageHandler->reply($message, 'Pong!'))
+        );
 
-        $help = new MessageHandlerCallback(function (Message $message, array $message_filtered, string $command): PromiseInterface
-        {
-            return $this->messageHandler->reply($message, $this->messageHandler->generateHelp($message->member->roles), 'help.txt', true);
-        });
+        $help = new MessageHandlerCallback(fn(Message $message, array $message_filtered, string $command): PromiseInterface =>
+            $this->messageHandler->reply($message, $this->messageHandler->generateHelp($message->member->roles), 'help.txt', true)
+        );
         $this->messageHandler->offsetSet('help', $help);
         $this->messageHandler->offsetSet('commands', $help);
 
