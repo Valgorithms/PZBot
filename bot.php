@@ -16,9 +16,23 @@ define('MAIN_INCLUDED', 1); // Token and SQL credential files may be protected l
 //@include getcwd() . '/vendor/autoload.php';
 if (! $autoloader = require file_exists(__DIR__.'/vendor/autoload.php') ? __DIR__.'/vendor/autoload.php' : __DIR__.'/../../autoload.php')
     throw new \Exception('Composer autoloader not found. Run `composer install` and try again.');
+function loadEnv(string $filePath = __DIR__ . '/.env'): void
+{
+    if (! file_exists($filePath)) throw new Exception("The .env file does not exist.");
 
-// This is required for the example script to work, but you should use Composer's autoloader instead
-require 'secret.php';
+    $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $trimmedLines = array_map('trim', $lines);
+    $filteredLines = array_filter($trimmedLines, fn($line) => $line && ! str_starts_with($line, '#'));
+
+    array_walk($filteredLines, function($line) {
+        [$name, $value] = array_map('trim', explode('=', $line, 2));
+        if (! array_key_exists($name, $_ENV)) putenv(sprintf('%s=%s', $name, $value));
+    });
+}
+loadEnv(getcwd() . '/.env');
+
+// This is required for the example script to work, but you should use .env instead
+//require 'secret.php';
 
 const MCRCON_DIR = __DIR__;
 const MCRCON_FILE = 'mcrcon.exe';
