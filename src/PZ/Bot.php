@@ -132,7 +132,7 @@ class Bot
 
     public function run()
     {
-        $this->discord->on('ready', function ($discord) {
+        $this->discord->on('init', function ($discord) {
             if ($guild = $this->discord->guilds->get('id', $this->guild_id)) $this->owner_id = $guild->owner_id;
             else $this->logger->warning('Discord Guild not found!');
             $this->generateGlobalFunctions();
