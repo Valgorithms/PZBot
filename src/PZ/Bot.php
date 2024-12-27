@@ -169,30 +169,33 @@ class Bot
      * And more! (see the code for more details)
      */
     protected function generateGlobalFunctions(): void
-    { // TODO: add infantry and veteran roles to all non-staff command parameters except for `approveme`
+    {
         // messageHandler
-        $this->messageHandler->offsetSet(
-            'ping',
-            new MessageHandlerCallback(fn(Message $message, array $message_filtered, string $command): PromiseInterface =>
-                $this->messageHandler->reply($message, 'Pong!'))
-        );
-
         $help = new MessageHandlerCallback(fn(Message $message, array $message_filtered, string $command): PromiseInterface =>
             $this->messageHandler->reply($message, $this->messageHandler->generateHelp($message->member->roles), 'help.txt', true)
         );
-        $this->messageHandler->offsetSet('help', $help);
-        $this->messageHandler->offsetSet('commands', $help);
+        $this->messageHandler
+            ->offsetSet('help', $help)
+            ->offsetSet('commands', $help)
+            ->offsetSet(
+                'ping',
+                new MessageHandlerCallback(fn(Message $message, array $message_filtered, string $command): PromiseInterface =>
+                    $this->messageHandler->reply($message, 'Pong!'))
+            )->offsetSet(
+                'players',
+                new MessageHandlerCallback(fn(Message $message, array $message_filtered, string $command): PromiseInterface =>
+                    $this->messageHandler->reply($message,
+                        ($players = $this->rcon->getPlayers())
+                            ? "Players (" . count($players) . "):" . PHP_EOL . implode(', ', $players)
+                            : 'No players found!'
+                    )
+                )
+            );
+    }
 
-        $players = new MessageHandlerCallback(function (Message $message, array $message_filtered, string $command): PromiseInterface
-        {
-            if (! $players = $this->rcon->getPlayers()) return $this->messageHandler->reply($message, 'No players found!');
-
-            $playerCount = count($players);
-            $playerList = implode(', ', $players);
-
-            return $this->messageHandler->reply($message, "Players ($playerCount):" . PHP_EOL . $playerList);
-        });
-        $this->messageHandler->offsetSet('players', $players);
+    protected function generateGuildFunctions(): void
+    {
+        //
     }
     
     protected function __updatePlayerCountChannel(): ?PromiseInterface
