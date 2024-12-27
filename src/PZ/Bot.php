@@ -22,9 +22,11 @@ use Monolog\Logger;
 use Monolog\Level;
 use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\StreamHandler;
+use PZ\Handlers\MessageHandler;
+use PZ\Handlers\MessageHandlerCallback;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class BOT
+class Bot
 {
     public StreamSelectLoop $loop;
     public Logger $logger;

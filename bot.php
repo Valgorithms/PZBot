@@ -13,14 +13,12 @@ ignore_user_abort(1);
 ini_set('max_execution_time', 0);
 ini_set('memory_limit', '-1'); // Unlimited memory usage
 define('MAIN_INCLUDED', 1); // Token and SQL credential files may be protected locally and require this to be defined to access
-@include getcwd() . '/vendor/autoload.php';
+//@include getcwd() . '/vendor/autoload.php';
+if (! $autoloader = require file_exists(__DIR__.'/vendor/autoload.php') ? __DIR__.'/vendor/autoload.php' : __DIR__.'/../../autoload.php')
+    throw new \Exception('Composer autoloader not found. Run `composer install` and try again.');
 
 // This is required for the example script to work, but you should use Composer's autoloader instead
 require 'secret.php';
-require 'RCON.php';
-require 'PZ.php';
-require 'Handler.php';
-require 'MessageHandler.php';
 
 const MCRCON_DIR = __DIR__;
 const MCRCON_FILE = 'mcrcon.exe';
@@ -68,9 +66,9 @@ $discord = new Discord([
 ]);
 
 $options = array(
-    'discordToken' => $discordToken,
-    'clientId' => $clientId,
-    'clientSecret' => $clientSecret,
+    //'discordToken' => $discordToken,
+    //'clientId' => $clientId,
+    //'clientSecret' => $clientSecret,
     'guild_id' => '1077144430588469349',
     'channel_ids' => array(
         'pz-players' => '1226732689525313638'
@@ -90,5 +88,5 @@ $hidden_options = [
 
 $options = array_merge($options, $hidden_options);
 
-$bot = new PZ\BOT($options);
+$bot = new PZ\Bot($options);
 $bot->run();

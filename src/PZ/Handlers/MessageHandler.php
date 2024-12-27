@@ -6,65 +6,14 @@
  * Copyright (c) 2024-present Valithor Obsidion <valithor@valzargaming.com>
  */
 
-namespace PZ\Interfaces;
+namespace PZ\Handlers;
 
-use Discord\Parts\Channel\Message;
-use React\Promise\PromiseInterface;
-
-
-interface MessageHandlerInterface extends HandlerInterface
-{
-    public function handle(Message $message): ?PromiseInterface;
-}
-
-interface MessageHandlerCallbackInterface
-{
-    public function __invoke(Message $message, array $message_filtered, string $command): ?PromiseInterface;
-}
-
-namespace PZ;
-
-use PZ\Interfaces\MessageHandlerCallbackInterface;
+use PZ\Bot;
 use Discord\Builders\MessageBuilder;
 use Discord\Parts\Channel\Message;
 use Discord\Parts\Embed\Embed;
 use Discord\Helpers\Collection;
 use React\Promise\PromiseInterface;
-
-class MessageHandlerCallback implements MessageHandlerCallbackInterface
-{
-    private \Closure $callback;
-
-    /**
-     * Class constructor.
-     *
-     * @param callable $callback The callback function to be executed.
-     * @throws \InvalidArgumentException If the callback does not have the expected number of parameters or if any parameter does not have a type hint or is of the wrong type.
-     */
-    public function __construct(callable $callback)
-    {
-        $reflection = new \ReflectionFunction($callback);
-        $parameters = $reflection->getParameters();
-
-        $expectedParameterTypes = [Message::class, 'array', 'string'];
-        if (count($parameters) !== $count = count($expectedParameterTypes)) throw new \InvalidArgumentException("The callback must take exactly $count parameters: " . implode(', ', $expectedParameterTypes));
-
-        foreach ($parameters as $index => $parameter) {
-            if (! $parameter->hasType()) throw new \InvalidArgumentException("Parameter $index must have a type hint.");
-            $type = $parameter->getType(); // This could be done all on one line, but it's easier to read this way and makes the compiler happy
-            if ($type !== null && $type instanceof \ReflectionNamedType) $type = $type->getName();
-            if ($type !== $expectedParameterTypes[$index]) throw new \InvalidArgumentException("Parameter $index must be of type {$expectedParameterTypes[$index]}.");
-        }
-
-        $this->callback = $callback;
-    }
-
-    public function __invoke(Message $message, array $message_filtered = [], string $command = ''): ?PromiseInterface
-    {
-        return call_user_func($this->callback, $message, $message_filtered, $command);
-    }
-}
-
 use PZ\Interfaces\MessageHandlerInterface;
 
 class MessageHandler extends Handler implements MessageHandlerInterface
@@ -73,7 +22,7 @@ class MessageHandler extends Handler implements MessageHandlerInterface
     protected array $match_methods;
     protected array $descriptions;
 
-    public function __construct(BOT &$pz, array $handlers = [], array $required_permissions = [], array $match_methods = [], array $descriptions = [])
+    public function __construct(Bot &$pz, array $handlers = [], array $required_permissions = [], array $match_methods = [], array $descriptions = [])
     {
         parent::__construct($pz, $handlers);
         $this->required_permissions = $required_permissions;
