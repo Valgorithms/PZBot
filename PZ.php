@@ -17,7 +17,6 @@ use Discord\Repository\Interaction\GlobalCommandRepository;
 use React\EventLoop\Loop;
 use React\EventLoop\LoopInterface;
 use React\EventLoop\StreamSelectLoop;
-use React\EventLoop\TimerInterface;
 use React\Promise\PromiseInterface;
 use Monolog\Logger;
 use Monolog\Level;
@@ -77,10 +76,7 @@ class BOT
         }
         $this->loop = $options['loop'];
         $this->logger = $options['logger'];
-        $this->onFulfilledDefault = function ($result): void
-        {
-            $this->logger->debug('Promise resolved with type of: `' . gettype($result) . '`');
-        };
+        $this->onFulfilledDefault = fn($result) => $this->logger->debug('Promise resolved with type of: `' . gettype($result) . '`');
         $this->onRejectedDefault = function ($reason): void
         {
             $this->logger->error("Promise rejected with reason: `$reason'`");
@@ -132,14 +128,12 @@ class BOT
             $this->rcon->getPlayers(true);
             $this->__startUpdatePlayerCountTimer();
 
-            $this->then($this->discord->application->commands->freshen(), function (GlobalCommandRepository $commands): void
-            {
-                $this->slash->updateCommands($commands);
-            });
+            $this->then(
+                $this->discord->application->commands->freshen(),
+                fn (GlobalCommandRepository $commands) => $this->slash->updateCommands($commands)
+            );
 
-            $this->discord->on('message', function ($message) {
-                $this->messageHandler->handle($message);
-            });
+            $this->discord->on('message', fn($message) => $this->messageHandler->handle($message));
         });
 
         
@@ -190,70 +184,34 @@ class BOT
         if (is_numeric($oldPlayerCount) && (intval($oldPlayerCount) === $newPlayerCount)) return null;
         
         $channel->name = "{$channelName}-{$newPlayerCount}";
-        $original_channel = clone $channel;
-        return $channel->guild->channels->save($channel, 'Player count update')->then(function ($new_channel) use ($original_channel): void
-        { // Debugging channel ID mismatch
-            if ($new_channel->id !== $original_channel->id) {
-                $this->logger->warning('Channel ID mismatch: ' . $new_channel->id . ' !== ' . $original_channel->id);
-                file_put_contents('original_channel.txt', print_r($original_channel, true));
-                file_put_contents('new_channel.txt', print_r($new_channel, true));
-                $new_channel->guild->channels->offsetSet($original_channel->id, $original_channel);
-                $new_channel->guild->channels->offsetSet($new_channel->id, $new_channel);
-            }
-        });
+        return $channel->guild->channels->save($channel, 'Player count update');
     }
 
     protected function __startUpdatePlayerCountTimer(): void
     {
         if (! isset($this->timers['updatePlayerCountTimer'])) {
-            $periodic = function(): void
-            {
-                if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return;
-                //if (! $channel->created) return;
-                $original_channel = clone $channel; // Debugging channel ID mismatch
-
-                $promise = null;
-                $populate = false;
-                if (($this->timerCounter !== 0) && ($this->timerCounter % 6 === 0)) $promise = $this->__updatePlayerCountChannel($populate = true);
-
-                $sendTransitMessage = function () use ($populate, $original_channel): void
+            $this->timers['updatePlayerCountTimer'] = $this->loop->addPeriodicTimer(
+                30,
+                function(): void
                 {
-                    if (! $channel = $this->discord->getChannel($original_channel->id)) return;
-                    $callable = function ($channel) use ($populate) {
-                        $msg = '';
-                        if ($playersWhoJoined = $this->rcon->getPlayersWhoJoined($populate ? false : true))
-                            if ($connected = trim(implode(', ', $playersWhoJoined)))
-                                $msg .= "Connected: $connected" . PHP_EOL;
-                        if ($playersWhoLeft = $this->rcon->getPlayersWhoLeft())
-                            if ($disconnected = trim(implode(', ', $playersWhoLeft)))
-                                $msg .= "Disconnected: $disconnected" . PHP_EOL;
-                        if ($msg) $this->messageHandler->sendMessage($channel, $msg);
-                    };
-                    if ($channel->id !== $original_channel->id) {
-                        $this->logger->warning('Channel ID mismatch: ' . $channel->id . ' !== ' . $original_channel->id);
-                        file_put_contents('original_channel.txt', print_r($original_channel, true));
-                        file_put_contents('new_channel.txt', print_r($channel, true));
-                        $channel->guild->channels->fetch($original_channel->id, true)->then(function ($new_channel) use ($callable): void
-                        { $callable($new_channel); });
-                    } else $callable($channel);
-                };
-                $onFulfilled = function (mixed $new_channel) use ($sendTransitMessage): TimerInterface
-                {
-                    $this->timerCounter = 0;
-                    return $this->loop->addTimer(2, $sendTransitMessage); // Doesn't fix the race condition, can still create a new channel and send all future messages to the newly created channel even though we are fetching the channel's ID directly from a hard-coded config
-                };
-                $onRejected = function ($reason) use ($channel): ?PromiseInterface
-                {
-                    $this->logger->error('Failed to update player count channel: ' . $reason);
-                    return $this->messageHandler->sendMessage($channel, 'Failed to update player count channel: ' . $reason);
-                };
-                if ($promise) $this->then($promise, $onFulfilled, $onRejected);
-                else {
-                    $sendTransitMessage();
-                    $this->timerCounter++;
+                    if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return;
+                    ($promise = ($this->timerCounter !== 0 && $this->timerCounter % 6 === 0) ? $this->__updatePlayerCountChannel($populate = true) : null)
+                        ? $this->then(
+                            $promise,
+                            fn() => $this->timerCounter = 0,
+                            function ($reason) use ($channel): ?PromiseInterface
+                            {
+                                $this->logger->error($err = "Failed to update player count channel: $reason");
+                                return $this->messageHandler->sendMessage($channel, $err);
+                            }
+                        ) : $this->timerCounter++;
+                    
+                    if ($msg = implode(PHP_EOL, array_filter([
+                        ($connected = trim(implode(', ', $this->rcon->getPlayersWhoJoined(true)))) ? "Connected: $connected" : '',
+                        ($disconnected = trim(implode(', ', $this->rcon->getPlayersWhoLeft()))) ? "Disconnected: $disconnected" : ''
+                    ]))) $this->messageHandler->sendMessage($channel, $msg);
                 }
-            };
-            $this->timers['updatePlayerCountTimer'] = $this->loop->addPeriodicTimer(30, $periodic);
+            );
         }
     }
 }
