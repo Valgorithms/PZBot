@@ -91,7 +91,7 @@ class BOT
         $resolver->setAllowedTypes('channel_ids', 'array');
         $resolver->setAllowedTypes('role_ids', 'array');
         $resolver->setAllowedTypes('discord', ['null', Discord::class]);
-        $resolver->setAllowedTypes('discord_options', 'array');
+        $resolver->setAllowedTypes('discord_options', ['null', 'array']);
         $resolver->setAllowedTypes('rcon', RCON::class);
         $resolver->setAllowedTypes('guild_id', 'string');
         $resolver->setAllowedTypes('command_symbol', 'string');
@@ -105,15 +105,13 @@ class BOT
         {
             $this->logger->error("Promise rejected with reason: `$reason'`");
         };
+        if (!$options['discord'] && empty($options['discord_options'])) {
+            throw new \InvalidArgumentException('Either discord or discord_options must be set.');
+        }
+        $this->discord = $options['discord'] ?? new Discord($options['discord_options']);
 
         foreach ($options['channel_ids'] as $key => $id) $this->channel_ids[$key] = $id;
         foreach ($options['role_ids'] as $key => $id) $this->role_ids[$key] = $id;
-
-        if ($options['discord'] instanceof Discord) {
-            $this->discord = $options['discord'];
-        } else {
-            $this->discord = new Discord($options['discord_options']);
-        }
 
         require 'slash.php';
         $this->slash = new Slash($this);

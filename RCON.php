@@ -131,7 +131,6 @@ class RCON
         }
 
         $playerLines = array_filter(array_map('trim', explode(PHP_EOL, $output)));
-        var_dump($playerLines);
         return implode(PHP_EOL, $playerLines);
     }
 }
