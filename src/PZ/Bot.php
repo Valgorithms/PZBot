@@ -18,6 +18,7 @@ use Discord\Repository\Interaction\GlobalCommandRepository;
 use React\EventLoop\Loop;
 use React\EventLoop\LoopInterface;
 use React\EventLoop\StreamSelectLoop;
+use React\EventLoop\TimerInterface;
 use React\Promise\PromiseInterface;
 use Monolog\Logger;
 use Monolog\Level;
@@ -132,7 +133,7 @@ class Bot
 
     public function run()
     {
-        $this->discord->on('init', function ($discord) {
+        $this->discord->on('init', function () {
             if ($guild = $this->discord->guilds->get('id', $this->guild_id)) $this->owner_id = $guild->owner_id;
             else $this->logger->warning('Discord Guild not found!');
             $this->generateGlobalFunctions();
@@ -143,18 +144,16 @@ class Bot
             $this->ready = true;
 
             $this->rcon->getPlayers(true);
-            $this->__startUpdatePlayerCountTimer();
+            $this->updatePlayerCountTimer();
 
             $this->then(
                 $this->discord->application->commands->freshen(),
                 fn (GlobalCommandRepository $commands) => $this->slash->updateGlobalCommands($commands)
             );
-            foreach ($this->discord->guilds as $guild) {
-                $this->then(
-                    $guild->commands->freshen(),
-                    fn (GuildCommandRepository $commands) => $this->slash->updateGuildCommands($commands)
-                );
-            }
+            foreach ($this->discord->guilds as $guild) $this->then(
+                $guild->commands->freshen(),
+                fn (GuildCommandRepository $commands) => $this->slash->updateGuildCommands($commands)
+            );
 
             $this->discord->on('message', fn($message) => $this->messageHandler->handle($message));
         });
@@ -211,31 +210,29 @@ class Bot
         return $channel->guild->channels->save($channel, 'Player count update');
     }
 
-    protected function __startUpdatePlayerCountTimer(): void
+    protected function updatePlayerCountTimer(): TimerInterface
     {
-        if (! isset($this->timers['updatePlayerCountTimer'])) {
-            $this->timers['updatePlayerCountTimer'] = $this->loop->addPeriodicTimer(
-                30,
-                function(): void
+        if (! isset($this->timers['updatePlayerCountTimer'])) $this->timers['updatePlayerCountTimer'] = $this->loop->addPeriodicTimer(30, $this->updatePlayerCount());
+        return $this->timers['updatePlayerCountTimer'];
+    }
+
+    protected function updatePlayerCount(): void
+    {
+        if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return;
+        ($promise = ($this->timerCounter !== 0 && $this->timerCounter % 6 === 0) ? $this->__updatePlayerCountChannel($populate = true) : null)
+            ? $this->then(
+                $promise,
+                fn() => $this->timerCounter = 0,
+                function ($reason) use ($channel): ?PromiseInterface
                 {
-                    if (! $channel = $this->discord->getChannel($this->channel_ids['pz-players'])) return;
-                    ($promise = ($this->timerCounter !== 0 && $this->timerCounter % 6 === 0) ? $this->__updatePlayerCountChannel($populate = true) : null)
-                        ? $this->then(
-                            $promise,
-                            fn() => $this->timerCounter = 0,
-                            function ($reason) use ($channel): ?PromiseInterface
-                            {
-                                $this->logger->error($err = "Failed to update player count channel: $reason");
-                                return $this->messageHandler->sendMessage($channel, $err);
-                            }
-                        ) : $this->timerCounter++;
-                    
-                    if ($msg = implode(PHP_EOL, array_filter([
-                        ($connected = trim(implode(', ', $this->rcon->getPlayersWhoJoined(true)))) ? "Connected: $connected" : '',
-                        ($disconnected = trim(implode(', ', $this->rcon->getPlayersWhoLeft()))) ? "Disconnected: $disconnected" : ''
-                    ]))) $this->messageHandler->sendMessage($channel, $msg);
+                    $this->logger->error($err = "Failed to update player count channel: $reason");
+                    return $this->messageHandler->sendMessage($channel, $err);
                 }
-            );
-        }
+            ) : $this->timerCounter++;
+        
+        if ($msg = implode(PHP_EOL, array_filter([
+            ($connected = trim(implode(', ', $this->rcon->getPlayersWhoJoined(true)))) ? "Connected: $connected" : '',
+            ($disconnected = trim(implode(', ', $this->rcon->getPlayersWhoLeft()))) ? "Disconnected: $disconnected" : ''
+        ]))) $this->messageHandler->sendMessage($channel, $msg);
     }
 }
