@@ -95,7 +95,7 @@ class MessageHandler extends Handler implements MessageHandlerInterface
         return $this;
     }
 
-    public function pull(int|string $index, ?callable $defaultCallables = null, array $default_required_permissions = null, array $default_match_methods = null, array $default_descriptions = null): array
+    public function pull(int|string $index, ?callable $defaultCallables = null, ?array $default_required_permissions = null, ?array $default_match_methods = null, ?array $default_descriptions = null): array
     {
         $return = [];
         $return[] = parent::pull($index, $defaultCallables);

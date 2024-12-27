@@ -22,6 +22,7 @@ use Monolog\Logger;
 use Monolog\Level;
 use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\StreamHandler;
+use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class BOT
 {
@@ -66,14 +67,37 @@ class BOT
         $this->messageHandler = new MessageHandler($this);
     }
 
-    public function resolveOptions($options)
+    public function resolveOptions(array $options = [])
     {
-        if (! isset($options['loop']) || ! ($options['loop'] instanceof LoopInterface)) $options['loop'] = Loop::get();
-        if (! isset($options['logger']) || ! ($options['logger'] instanceof Logger)) {
-            $streamHandler = new StreamHandler('php://stdout', Level::Info);
-            $streamHandler->setFormatter(new LineFormatter(null, null, true, true));
-            $options['logger'] = new Logger(self::class, [$streamHandler]);
-        }
+        $resolver = new OptionsResolver();
+        
+        $resolver->setDefaults([
+            'loop' => Loop::get(),
+            'logger' => new Logger(
+                self::class,
+                [(new StreamHandler('php://stdout', Level::Info))->setFormatter(new LineFormatter(null, null, true, true))]
+            ),
+            'channel_ids' => [],
+            'role_ids' => [],
+            'discord' => null,
+            'discord_options' => [],
+            'rcon' => null,
+            'guild_id' => null,
+            'command_symbol' => ';',
+        ]);
+
+        $resolver->setAllowedTypes('loop', [LoopInterface::class]);
+        $resolver->setAllowedTypes('logger', [Logger::class]);
+        $resolver->setAllowedTypes('channel_ids', 'array');
+        $resolver->setAllowedTypes('role_ids', 'array');
+        $resolver->setAllowedTypes('discord', ['null', Discord::class]);
+        $resolver->setAllowedTypes('discord_options', 'array');
+        $resolver->setAllowedTypes('rcon', RCON::class);
+        $resolver->setAllowedTypes('guild_id', 'string');
+        $resolver->setAllowedTypes('command_symbol', 'string');
+
+        $options = $resolver->resolve($options);
+
         $this->loop = $options['loop'];
         $this->logger = $options['logger'];
         $this->onFulfilledDefault = fn($result) => $this->logger->debug('Promise resolved with type of: `' . gettype($result) . '`');
@@ -82,27 +106,20 @@ class BOT
             $this->logger->error("Promise rejected with reason: `$reason'`");
         };
 
-        if (isset($options['channel_ids'])) foreach ($options['channel_ids'] as $key => $id) $this->channel_ids[$key] = $id;
-        else $this->logger->warning('No channel_ids passed in options!');
-        if (isset($options['role_ids'])) foreach ($options['role_ids'] as $key => $id) $this->role_ids[$key] = $id;
-        else $this->logger->warning('No role_ids passed in options!');
+        foreach ($options['channel_ids'] as $key => $id) $this->channel_ids[$key] = $id;
+        foreach ($options['role_ids'] as $key => $id) $this->role_ids[$key] = $id;
 
-        if (isset($options['discord']) && ($options['discord'] instanceof Discord)) $this->discord = $options['discord'];
-        elseif (isset($options['discord_options']) && is_array($options['discord_options'])) $this->discord = new Discord($options['discord_options']);
-        else $this->logger->error('No Discord instance or options passed in options!');
-        if (isset($options['discordToken'])) unset($options['discordToken']);
+        if ($options['discord'] instanceof Discord) {
+            $this->discord = $options['discord'];
+        } else {
+            $this->discord = new Discord($options['discord_options']);
+        }
 
         require 'slash.php';
         $this->slash = new Slash($this);
 
-        if (! isset($options['rcon']) || ! ($options['rcon'] instanceof RCON)) throw new \InvalidArgumentException('Invalid RCON object!');
         $this->rcon = $options['rcon'];
-        
-        if (isset($options['guild_id']) && is_string($options['guild_id'])) $this->guild_id = $options['guild_id'];
-        else throw new \InvalidArgumentException('Invalid Discord guild_id!');
-
-        if (isset($options['command_symbol']) && is_string($options['command_symbol'])) $this->command_symbol = $options['command_symbol'];
-        else $options['command_symbol'] = ';';
+        $this->guild_id = $options['guild_id'];
         $this->command_symbol = $options['command_symbol'];
 
         return $this->options = $options;
