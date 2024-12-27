@@ -3,3 +3,5 @@
 secret.php
 composer.lock
 .env
+botlog.txt
+run.bat
