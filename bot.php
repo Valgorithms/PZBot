@@ -24,8 +24,6 @@ require 'MessageHandler.php';
 
 const MCRCON_DIR = __DIR__;
 const MCRCON_FILE = 'mcrcon.exe';
-const BAT_DIR = __DIR__;
-const BAT_FILE = 'pz.bat';
 const RCON_PORT = 27015;
 $discordToken = getenv('discord_token');
 $clientId = getenv('dwa_client_id');
@@ -33,7 +31,7 @@ $clientSecret = getenv('dwa_client_secret');
 $rconPassword = getenv('rcon_password');
 $globalIp = gethostbyname('www.valzargaming.com');
 
-$rcon = new PZ\RCON($globalIp, RCON_PORT, $rconPassword, MCRCON_DIR, MCRCON_FILE, BAT_DIR, BAT_FILE);
+$rcon = new PZ\RCON($globalIp, RCON_PORT, $rconPassword, MCRCON_DIR, MCRCON_FILE);
 
 use Discord\Discord;
 use React\EventLoop\Loop;

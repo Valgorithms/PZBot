@@ -16,14 +16,12 @@ class RCON
     private readonly string $rconPassword;
     //private string $mcrconDir = '';
     private string $mcrconPath = '';
-    private string $batDir = '';
-    private string $batPath = '';
 
     public bool $initialized = false;
     public array $previousPlayers = [];
     public array $currentPlayers = [];
 
-    public function __construct(string $serverIp, int $rconPort, string $rconPassword, string $mcrconDir, ?string $mcronPath = 'mcrcon.exe', ?string $batDir = __DIR__, ?string $batFile = 'pz.bat')
+    public function __construct(string $serverIp, int $rconPort, string $rconPassword, string $mcrconDir, ?string $mcronPath = 'mcrcon.exe')
     {
         if (! filter_var($serverIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_IPV6 | FILTER_FLAG_NO_RES_RANGE)) 
             throw new \InvalidArgumentException('Invalid server IP address');
@@ -41,14 +39,6 @@ class RCON
         if (! file_exists($mcrconPath = $mcrconDir . '\\' . $mcronPath))
             throw new \InvalidArgumentException('Invalid file for mcrcon:' . $mcrconPath);
         $this->mcrconPath = $mcrconPath;
-
-        if (! is_dir($batDir))
-            throw new \InvalidArgumentException('Invalid directory for pz.bat:' . $batDir);
-        $this->batDir = $batDir;
-
-        if (! file_exists($batDir . '\\' . $batFile))
-            throw new \InvalidArgumentException('Invalid file for pz.bat:' . $batFile);
-        $this->batPath = $batDir . '\\' . $batFile;
 
         $this->__populatePlayers();
         $this->initialized = true;
@@ -84,18 +74,64 @@ class RCON
         
         $playersString = $this->__getPlayersString();
         $playersString = is_string($playersString) ? str_replace("Error: Failed to execute mcrcon command.", "", $playersString) : '';
-        return $this->currentPlayers = $playersString ? explode("\n", trim($playersString)) : [];
+        return $this->currentPlayers = $playersString ? explode(PHP_EOL, trim($playersString)) : [];
     }
-    
-    /*
-    * Function to execute pz.bat in the current directory
-    * Creats a txt file containing the output of the batch file, formatted as a list of players
-    * Usage: pz.bat SERVER_IP [RCON_PASSWORD] [RCON_PORT] [MCRCON_PATH]
-    */
-    private function __getPlayersString(): string|false|null
-    {   
-        $launchOptions = sprintf('"%s" "%s" "%d" "%s"', $this->serverIp, $this->rconPassword, $this->rconPort, $this->mcrconPath);
-        $cmd = "cd /d \"{$this->batDir}\" && \"{$this->batPath}\" $launchOptions";
-        return shell_exec($cmd);
+
+    private function __getPlayersString(): string|false
+    { // Needs to be tested
+        if (empty($this->serverIp)) {
+            echo "Error: Failed to resolve server IP address." . PHP_EOL;
+            return false;
+        }
+
+        // "a" (or any other input) is needed to flush the output buffer
+        $command = sprintf('%s -H %s -P %s -p %s "players" "a"', escapeshellcmd($this->mcrconPath), escapeshellarg($this->serverIp), escapeshellarg($this->rconPort), escapeshellarg($this->rconPassword));
+        exec($command, $output, $returnVar);
+
+        if ($returnVar !== 0) {
+            echo "Error: Failed to execute mcrcon command." . PHP_EOL;
+            return false;
+        }
+
+        $playerLines = array_map(function($line) {
+            return substr($line, 1);
+        }, array_slice($output, 1));
+
+        return implode(PHP_EOL, $playerLines);
+    }
+
+    private function __(): string|false
+    { // Needs to be tested
+        $socket = fsockopen($this->serverIp, $this->rconPort, $errno, $errstr, 30);
+        if (!$socket) {
+            echo "Error: $errstr ($errno)" . PHP_EOL;
+            return false;
+        }
+
+        $authCommand = sprintf("auth %s" . PHP_EOL, $this->rconPassword);
+        fwrite($socket, $authCommand);
+        $authResponse = fgets($socket);
+        if (strpos($authResponse, 'failed') !== false) {
+            echo "Error: Authentication failed." . PHP_EOL;
+            fclose($socket);
+            return false;
+        }
+
+        $command = "players" . PHP_EOL;
+        fwrite($socket, $command);
+        $output = '';
+        while (!feof($socket)) {
+            $output .= fgets($socket, 128);
+        }
+        fclose($socket);
+
+        if (empty($output)) {
+            echo "Error: Failed to retrieve player list." . PHP_EOL;
+            return false;
+        }
+
+        $playerLines = array_filter(array_map('trim', explode(PHP_EOL, $output)));
+        var_dump($playerLines);
+        return implode(PHP_EOL, $playerLines);
     }
 }
